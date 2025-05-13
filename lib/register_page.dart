@@ -14,6 +14,16 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _schoolController = TextEditingController();
   bool _loading = false;
+  bool _obscurePassword = true;
+  String _passwordErrorText = '';
+  String _emailErrorText = '';
+
+  // Password requirements
+  bool _hasMinLength = false;
+  bool _hasUpperCase = false;
+  bool _hasLowerCase = false;
+  bool _hasNumber = false;
+  bool _hasSpecialChar = false;
 
   Future<void> _registerProfessor() async {
     try {
@@ -29,25 +39,13 @@ class _RegisterPageState extends State<RegisterPage> {
         return;
       }
 
-      if (!email.toLowerCase().contains('prof')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Professor email must contain "prof"')),
-        );
+      // Validate email format and professor requirement
+      if (!_validateEmail(email)) {
         return;
       }
 
-      if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter a valid email address')),
-        );
-        return;
-      }
-
-      if (password.length < 6) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Password must be at least 6 characters')),
-        );
+      // Validate password strength
+      if (!_validatePassword(password)) {
         return;
       }
 
@@ -84,14 +82,83 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
+  bool _validateEmail(String email) {
+    // Standard email regex with additional check for professor email
+    final emailRegex = RegExp(
+        r'^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$');
+
+    if (!emailRegex.hasMatch(email)) {
+      setState(() => _emailErrorText = 'Please enter a valid email address');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid email address')),
+      );
+      return false;
+    }
+
+    if (!email.toLowerCase().contains('prof')) {
+      setState(() => _emailErrorText = 'Professor email must contain "prof"');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Professor email must contain "prof"')),
+      );
+      return false;
+    }
+
+    setState(() => _emailErrorText = '');
+    return true;
+  }
+
+  bool _validatePassword(String password) {
+    // Reset error
+    setState(() => _passwordErrorText = '');
+
+    // Check all requirements
+    _hasMinLength = password.length >= 8;
+    _hasUpperCase = password.contains(RegExp(r'[A-Z]'));
+    _hasLowerCase = password.contains(RegExp(r'[a-z]'));
+    _hasNumber = password.contains(RegExp(r'[0-9]'));
+    _hasSpecialChar = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
+
+    if (!_hasMinLength ||
+        !_hasUpperCase ||
+        !_hasLowerCase ||
+        !_hasNumber ||
+        !_hasSpecialChar) {
+      setState(
+          () => _passwordErrorText = 'Password does not meet requirements');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Password does not meet all requirements')),
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  void _onPasswordChanged(String password) {
+    // Update password requirements in real-time
+    setState(() {
+      _hasMinLength = password.length >= 8;
+      _hasUpperCase = password.contains(RegExp(r'[A-Z]'));
+      _hasLowerCase = password.contains(RegExp(r'[a-z]'));
+      _hasNumber = password.contains(RegExp(r'[0-9]'));
+      _hasSpecialChar = password.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
+    });
+  }
+
   Widget _buildTextField(
       TextEditingController controller, String label, IconData icon,
-      {bool obscure = false, TextInputType? keyboardType, int? maxLength}) {
+      {bool obscure = false,
+      TextInputType? keyboardType,
+      int? maxLength,
+      String? errorText,
+      Function(String)? onChanged}) {
     return TextField(
       controller: controller,
       obscureText: obscure,
       keyboardType: keyboardType,
       maxLength: maxLength,
+      onChanged: onChanged,
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: label,
@@ -103,8 +170,108 @@ class _RegisterPageState extends State<RegisterPage> {
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,
         ),
+        errorText: errorText?.isNotEmpty == true ? errorText : null,
+        errorStyle: const TextStyle(color: Colors.orange),
         counterText: '',
       ),
+    );
+  }
+
+  Widget _buildPasswordRequirements() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Password must contain:',
+          style: TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Icon(
+              _hasMinLength ? Icons.check_circle : Icons.error,
+              color: _hasMinLength ? Colors.green : Colors.orange,
+              size: 16,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '8+ characters',
+              style: TextStyle(
+                color: _hasMinLength ? Colors.green : Colors.orange,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Icon(
+              _hasUpperCase ? Icons.check_circle : Icons.error,
+              color: _hasUpperCase ? Colors.green : Colors.orange,
+              size: 16,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '1 uppercase letter',
+              style: TextStyle(
+                color: _hasUpperCase ? Colors.green : Colors.orange,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Icon(
+              _hasLowerCase ? Icons.check_circle : Icons.error,
+              color: _hasLowerCase ? Colors.green : Colors.orange,
+              size: 16,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '1 lowercase letter',
+              style: TextStyle(
+                color: _hasLowerCase ? Colors.green : Colors.orange,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Icon(
+              _hasNumber ? Icons.check_circle : Icons.error,
+              color: _hasNumber ? Colors.green : Colors.orange,
+              size: 16,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '1 number',
+              style: TextStyle(
+                color: _hasNumber ? Colors.green : Colors.orange,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+        Row(
+          children: [
+            Icon(
+              _hasSpecialChar ? Icons.check_circle : Icons.error,
+              color: _hasSpecialChar ? Colors.green : Colors.orange,
+              size: 16,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '1 special character',
+              style: TextStyle(
+                color: _hasSpecialChar ? Colors.green : Colors.orange,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -143,15 +310,44 @@ class _RegisterPageState extends State<RegisterPage> {
                 const SizedBox(height: 28),
                 _buildTextField(_nameController, 'Full Name', Icons.person),
                 const SizedBox(height: 16),
-                _buildTextField(_emailController, 'Email (must contain "prof")',
-                    Icons.email,
-                    keyboardType: TextInputType.emailAddress),
-                const SizedBox(height: 16),
-                _buildTextField(_passwordController, 'Password', Icons.lock,
-                    obscure: true),
+                _buildTextField(
+                  _emailController,
+                  'Email (must contain "prof")',
+                  Icons.email,
+                  keyboardType: TextInputType.emailAddress,
+                  errorText: _emailErrorText,
+                ),
                 const SizedBox(height: 16),
                 _buildTextField(
-                    _schoolController, 'School/Department', Icons.school),
+                  _passwordController,
+                  'Password',
+                  Icons.lock,
+                  obscure: _obscurePassword,
+                  errorText: _passwordErrorText,
+                  onChanged: _onPasswordChanged,
+                ),
+                const SizedBox(height: 8),
+                // Toggle password visibility
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      setState(() => _obscurePassword = !_obscurePassword);
+                    },
+                    child: Text(
+                      _obscurePassword ? 'Show Password' : 'Hide Password',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+                _buildTextField(
+                  _schoolController,
+                  'School/Department',
+                  Icons.school,
+                ),
+                _buildPasswordRequirements(),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
